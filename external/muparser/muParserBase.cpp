@@ -41,6 +41,8 @@
   #include <omp.h>
 #endif
 
+#include <omp.h>
+
 using namespace std;
 
 /** \file
@@ -1431,8 +1433,11 @@ namespace mu
   */
   value_type ParserBase::ParseString() const
   {
+//#pragma omp critical
+{
     try
     {
+//Rahul
       CreateRPN();
       m_pParseFormula = &ParserBase::ParseCmdCode;
       return (this->*m_pParseFormula)(); 
@@ -1443,7 +1448,7 @@ namespace mu
       throw;
     }
   }
-
+}
   //---------------------------------------------------------------------------
   /** \brief Create an error containing the parse error position.
 

@@ -444,8 +444,8 @@ double Ksolve::getEstimatedDt() const
 //////////////////////////////////////////////////////////////
 void Ksolve::process( const Eref& e, ProcPtr p )
 {
-//Rahul - starting the timer to measure the time taken in the process function
 
+//Rahul - starting the timer to measure the time taken in the process function
 
         static unsigned int usedThreads = 0;
 
@@ -474,7 +474,6 @@ void Ksolve::process( const Eref& e, ProcPtr p )
 		setBlock( dvalues );
 	}
 
-//	 omp_set_num_threads(4);
 	// Second, take the arrived xCompt reac values and update S with them.
 
 	for ( unsigned int i = 0; i < xfer_.size(); ++i ) 
@@ -501,71 +500,77 @@ void Ksolve::process( const Eref& e, ProcPtr p )
 
 	int nprocessors = omp_get_max_threads();
 
-        //int num_threads = 4;
-        //omp_set_num_threads(num_threads);
-
-        int poolSize = pools_.size();
+        int num_threads = 2;
+        omp_set_num_threads(num_threads);
+//	   double startTimer = omp_get_wtime();
 
 
         //Changing the iterator of for loop from != to < due to OpenMP restricions
         // Fourth, do the numerical integration for all reactions.
         start_timer = clock();
 
-
         //Rahul - This for loop is to be parallelized.... lets do it using openmp for pragma
-        //   #pragma omp parallel for firstprivate(p)
-        //	for ( vector< VoxelPools >::iterator i = pools_.begin(); i < pools_.end(); ++i ) 
-        //		i->advance( p );
+//#pragma omp parallel for
+        	for ( vector< VoxelPools >::iterator i = pools_.begin(); i < pools_.end(); ++i ) 
+        		i->advance( p );
+//
 
+/*Rahul - trying with task-based paralllelism with generic iteration number*/
 
+//Rahul - using these two variables do divide the loop. 
+//The first part divides the vector as a multiple of the number of threads 
+//The second part can be used to hard code the number of vector elements in a task. 
 
-        //Rahul - trying with task-based paralllelism with generic iteration number
-        //Rahul - using these two variables do divide the loop. 
+        int poolSize = pools_.size(); //Find out the size of the vector
 
+//	   int numBlocks = num_threads; //To divide the group based on the number of threads used
+//        int blockSize = poolSize/numBlocks;
+//
+//        int blockSize = 8; //Represents how many iteration per task
+//        int numBlocks = poolSize/blockSize; // How many such tasks
+//
+//        int remainder = poolSize % blockSize;
+//
+//#pragma omp parallel 
+//#pragma omp single
+//        {
+//	        if( usedThreads == 0)
+//	        {
+//	        	usedThreads = omp_get_num_threads();
+//	        	cout << "Info: Threads used: " << usedThreads << endl;
+//	        }
+//
+//            vector<VoxelPools>::iterator i = pools_.begin();
+//            int iterator = 0;
+//            int j = 0;
+//
+//            while(iterator < numBlocks)
+//            {
+//                vector<VoxelPools>::iterator threadIterator = i;
+//#pragma omp task
+//                {
+//                    for(j = 0; j < blockSize ; threadIterator++,j++)
+//                        threadIterator->advance( p );
+//                }
+//
+//                iterator++;
+//                for(j = 0; j < blockSize ;j++) i++;
+//            }
+//
+//            for(j = 0; j < remainder ; j++, ++i)
+//	    {
+//		#pragma omp task
+//                i->advance( p );
+//	    }
+//
+//#pragma omp taskwait
+//        }
+//
+//	   cout << "Time taken for this omp paraleization "<< (omp_get_wtime() - startTimer) << endl ;
+      duration += (clock() - start_timer) / (double) CLOCKS_PER_SEC;
 
-        unsigned int num_threads = omp_get_num_threads();
-        int numBlocks = num_threads;
-        int blockSize = poolSize/numBlocks;
-        //int blockSize = 8; //Represents how many iteration per task
-        //int numBlocks = poolSize/blockSize; // How many such tasks
-
-        int remainder = poolSize % blockSize;
-
-#pragma omp parallel 
-#pragma omp single
-        {
-            if( usedThreads == 0)
-            {
-                usedThreads = omp_get_num_threads();
-                cout << "Info: Threads used: " << usedThreads << endl;
-            }
-
-            vector<VoxelPools>::iterator i = pools_.begin();
-            int iterator = 0;
-            int j = 0;
-
-            while(iterator < numBlocks)
-            {
-                vector<VoxelPools>::iterator threadIterator = i;
-#pragma omp task
-                {
-                    for(j = 0; j < blockSize ; threadIterator++,j++)
-                        threadIterator->advance( p );
-                }
-
-                iterator++;
-                for(j = 0; j < blockSize ;j++) i++;
-            }
-
-            for(j = 0; j < remainder ; j++, ++i)
-                //          #pragma omp task
-                i->advance( p );
-
-#pragma omp taskwait
-        }
-
-        duration += (clock() - start_timer) / (double) CLOCKS_PER_SEC;
-        // cout << "Time taken in Ksolve:: process function is " << duration << "secs" <<  endl;
+	 if(duration >= 0.01)
+	 cout << "Time taken by the integration for this ksolve process call = "<< duration << endl;
 
 
         // Finally, assemble and send the integrated values off for the Dsolve.

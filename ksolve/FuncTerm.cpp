@@ -139,5 +139,6 @@ void FuncTerm::evalPool( double* S, double t ) const
 	for ( i = 0; i < reactantIndex_.size(); ++i )
 		args_[i] = S[reactantIndex_[i]];
 	args_[i] = t;
+//#pragma omp critical
 	S[ target_] = parser_.Eval();
 }

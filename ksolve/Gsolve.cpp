@@ -317,6 +317,8 @@ void Gsolve::setRandInit( bool val )
 //////////////////////////////////////////////////////////////
 void Gsolve::process( const Eref& e, ProcPtr p )
 {
+
+//	cout << "Inside gsolve::pocess" << endl;
 	// cout << stoichPtr_ << "	dsolve = " <<	dsolvePtr_ << endl;
 	if ( !stoichPtr_ )
 		return;

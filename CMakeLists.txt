@@ -146,11 +146,13 @@ else()
     add_definitions(-UDO_UNIT_TESTS -O3)
 endif()
 
-if(GPROF AND DEBUG)
+#if(GPROF AND DEBUG)
     message(STATUS "Compiling with GPROF")
-    add_definitions(-pg)
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-pg")
-endif()
+#    add_definitions(-pg)
+#    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-pg")
+    set(CMAKE_C_FLAGS "-pg")
+    set(CMAKE_CXX_FLAGS "-pg")
+#endif()
 
 ################################### SETUP BUILD ################################
 

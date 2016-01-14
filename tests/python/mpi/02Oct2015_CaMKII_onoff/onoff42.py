@@ -7,6 +7,9 @@
 # test neuronal plasticity in different contexts.
 ########################################################################
 
+import os
+import signal
+
 import numpy
 import time
 import pylab
@@ -18,8 +21,16 @@ import os
 from moose.neuroml.ChannelML import ChannelML
 import rdesigneur as rd
 
+#Import the yep package to generate a profile output which can be later profiled using google performance tools (pprof) and the output viewed using kcachegind. 
+
+import yep
+
+PID = os.getpid()
+def do_nothing(*args):
+    pass
+
 PI = 3.14159265359
-useGssa = True
+useGssa = False
 combineSegments = False
 baselineTime = 10
 tetTime = 1
@@ -50,7 +61,7 @@ def buildRdesigneur():
     ##################################################################
     cellProto = [ ['../cells/ca1_minimal.p', 'elec'] ]
     spineProto = [ ['makeSpineProto()', 'spine' ]]
-    chemProto = [ ['../chem/CaMKII_merged42.g', 'chem'] ]
+    chemProto = [ ['../chem/CaMKII_merged42_noFunc.g', 'chem'] ]
 
     ##################################################################
     # Here we define what goes where, and any parameters. Each distribution
@@ -169,6 +180,9 @@ def main():
     # Run for baseline, tetanus, and post-tetanic settling time 
     print 'starting...'
     t1 = time.time()
+#Start the profiling here and the parameter is the file to which the output is written
+#    yep.start("output_block8.prof")
+
     moose.start( baselineTime )
     caPsd = moose.vec( '/model/chem/psd/Ca_input' )
     caDend = moose.vec( '/model/chem/dend/DEND/Ca_input' )
@@ -191,6 +205,11 @@ def main():
     caPsd.concInit = basalCa
     caDend.concInit = basalCa
     moose.start( postLtdTime )
+
+#Stop the profiling 
+#    yep.stop()
+
+
     print 'real time = ', time.time() - t1
 
     # displayPlots()
