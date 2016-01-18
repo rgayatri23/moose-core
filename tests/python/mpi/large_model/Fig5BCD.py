@@ -30,9 +30,9 @@ PI = 3.14159265359
 useGssa = True
 combineSegments = False
 #### Choose your favourite model here. #################
-elecFileNames = ( "ca1_minimal.p", )
+#elecFileNames = ( "ca1_minimal.p", )
 #elecFileNames = ( "ca1_minimal.p", "h10.CNG.swc" )
-#elecFileNames = ( "CA1.morph.xml", "ca1_minimal.p", "VHC-neuron.CNG.swc", "h10.CNG.swc" )
+elecFileNames = ( "CA1.morph.xml", "ca1_minimal.p", "VHC-neuron.CNG.swc", "h10.CNG.swc" )
 synSpineList = []
 synDendList = []
 probeInterval = 0.1
@@ -40,9 +40,9 @@ probeAmplitude = 1.0
 tetanusFrequency = 100.0
 tetanusAmplitude = 1000
 tetanusAmplitudeForSpines = 1000
-baselineTime = 0.5
-tetTime = 0.2
-postTetTime =  1 
+baselineTime = 0.05
+tetTime = 0.02
+postTetTime =  0.5
 
 def buildRdesigneur():
     ##################################################################
