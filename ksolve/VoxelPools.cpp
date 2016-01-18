@@ -81,19 +81,22 @@ void VoxelPools::advance( const ProcInfo* p )
 #ifdef USE_GSL
 	double t = p->currTime - p->dt;
 	int status = gsl_odeiv2_driver_apply( driver_, &t, p->currTime, varS());
-	if ( status != GSL_SUCCESS ) {
-		cout << "Error: VoxelPools::advance: GSL integration error at time "
-			 << t << "\n";
-		cout << "Error info: " << status << ", " << 
-				gsl_strerror( status ) << endl;
-		if ( status == GSL_EMAXITER ) 
-			cout << "Max number of steps exceeded\n";
-		else if ( status == GSL_ENOPROG ) 
-			cout << "Timestep has gotten too small\n";
-		else if ( status == GSL_EBADFUNC ) 
-			cout << "Internal error\n";
-		assert( 0 );
-	}
+
+//Rahul - trying to comment the if-condition loops to see if this is the reason for performance bottleneck. 
+
+//	if ( status != GSL_SUCCESS ) {
+//		cout << "Error: VoxelPools::advance: GSL integration error at time "
+//			 << t << "\n";
+//		cout << "Error info: " << status << ", " << 
+//				gsl_strerror( status ) << endl;
+//		if ( status == GSL_EMAXITER ) 
+//			cout << "Max number of steps exceeded\n";
+//		else if ( status == GSL_ENOPROG ) 
+//			cout << "Timestep has gotten too small\n";
+//		else if ( status == GSL_EBADFUNC ) 
+//			cout << "Internal error\n";
+//		assert( 0 );
+//	}
 #endif
 }
 

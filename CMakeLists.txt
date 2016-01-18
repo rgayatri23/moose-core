@@ -76,7 +76,7 @@ option(DEBUG "Building with debugging support" OFF)
 option(GPROF "Build of gprof support" OFF)
 option(ENABLE_UNIT_TESTS "ENABLE UNIT TESTS IN MOOSE" ON)
 option(WITH_PYTHON "Build native python extension of MOOSE" ON)
-option(WITH_MPI  "Enable OPENMPI support" OFF)
+option(WITH_MPI  "Enable OPENMPI support" ON)
 option(WITH_CURSES "Enable ncurses" OFF)
 # If GSL_STATIC_HOME is set, we use it to search for static gsl libs.
 option(GSL_STATIC_HOME 
@@ -107,14 +107,13 @@ add_definitions(-Wall
     #-Wno-unused-private-field
     )
 add_definitions(-fPIC)
+## DO UNIT TESTS 
+option(ENABLE_UNIT_TESTS "ENABLE UNIT TESTS IN MOOSE" ON)
+if(ENABLE_UNIT_TESTS)
+    MESSAGE("++ Unit testing enabled.")
+    add_definitions(-DDO_UNIT_TESTS)
+endif()
 
-## Enable/Disable 2011 stupport.
-include(CheckCXXCompilerFlag)
-
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-
-############################ BUILD CONFIGURATION #################################
 set(VERIFY 1)
 if(VERIFY)
     add_definitions(-DSANITY_CHECK -DARGS_CHECK -DRESULT_CHECK -DVALUE_CHECK)
@@ -147,11 +146,13 @@ else()
     add_definitions(-UDO_UNIT_TESTS -O3)
 endif()
 
-if(GPROF AND DEBUG)
+#if(GPROF AND DEBUG)
     message(STATUS "Compiling with GPROF")
-    add_definitions(-pg)
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-pg")
-endif()
+#    add_definitions(-pg)
+#    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-pg")
+    set(CMAKE_C_FLAGS "-pg")
+    set(CMAKE_CXX_FLAGS "-pg")
+#endif()
 
 ################################### SETUP BUILD ################################
 
@@ -245,19 +246,29 @@ endif()
 
 # Openmpi
 if(WITH_MPI)
-    find_package(MPI REQUIRED)
-    if(MPI_CXX_FOUND)
-        message("++ Using MPI from ${MPI_CXX_INCLUDE_PATH}")
-        include_directories(${MPI_CXX_INCLUDE_PATH})
-        set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
-        add_definitions(-DUSE_MPI)
-        SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-        SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-    else()
-        message("++ Cound not find MPI")
-        add_definitions(-UUSE_MPI)
-    endif()
+    find_package(OpenMP REQUIRED)
+    MESSAGE("++ OpenMPI support is ON")
+    add_definitions(-DUSE_OPENMPI)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif(WITH_MPI)
+
+#if(WITH_MPI)
+#    find_package(MPI REQUIRED)
+#    set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+#    set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+#    if(MPI_CXX_FOUND)
+#        message("++ Using MPI from ${MPI_CXX_INCLUDE_PATH}")
+#        include_directories(${MPI_CXX_INCLUDE_PATH})
+#        set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
+#        add_definitions(-DUSE_MPI)
+#        SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+#        MESSAGE(STATUS "MPI compiler: ${MPI_CXX_COMPILER}")
+#        SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+#    else()
+#        MESSAGE(FATAL_ERROR "No openmpi installed on this machine")
+#    endif()
+#endif(WITH_MPI)
 
 # Add subdirectroeis
 add_subdirectory(basecode)
@@ -324,9 +335,7 @@ if(READLINE_FOUND AND TERMCAP_FOUND)
 endif()
 
 if(WITH_MPI)
-    if(MPI_CXX_FOUND)
-        list(APPEND SYSTEM_SHARED_LIBS ${MPI_CXX_LIBRARIES})
-    endif()
+    list(APPEND SYSTEM_SHARED_LIBS ${OpenMP_LIBRARIES})
 endif(WITH_MPI)
 
 ###################################### LINKING #################################
@@ -373,6 +382,8 @@ ELSE(MACOSX)
         ${MOOSE_LIBRARIES}
         ${STATIC_LIBRARIES}
         "-Wl,--no-whole-archive"
+        )
+    target_link_libraries(libmoose
         ${SYSTEM_SHARED_LIBS}
         )
 ENDIF(MACOSX)
