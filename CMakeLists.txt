@@ -107,7 +107,7 @@ add_definitions(-Wall
     #-Wno-unused-private-field
     )
 add_definitions(-fPIC)
-## DO UNIT TESTS 
+## DO UNIT TEST
 option(ENABLE_UNIT_TESTS "ENABLE UNIT TESTS IN MOOSE" ON)
 if(ENABLE_UNIT_TESTS)
     MESSAGE("++ Unit testing enabled.")
@@ -143,16 +143,9 @@ if(ENABLE_UNIT_TESTS AND DEBUG)
 else()
     MESSAGE("++ Build for Relase/ No unit tests.")
     set(CMAKE_BUILD_TYPE Release)
-    add_definitions(-UDO_UNIT_TESTS -O3)
+    add_definitions(-UDO_UNIT_TESTS )
 endif()
 
-#if(GPROF AND DEBUG)
-    message(STATUS "Compiling with GPROF")
-#    add_definitions(-pg)
-#    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-pg")
-    set(CMAKE_C_FLAGS "-pg")
-    set(CMAKE_CXX_FLAGS "-pg")
-#endif()
 
 ################################### SETUP BUILD ################################
 
@@ -191,19 +184,28 @@ add_definitions(-DUSE_GSL)
 IF(GSL_STATIC_HOME)
     SET(GSL_INCLUDE_DIR "${GSL_STATIC_HOME}/include")
     find_library(GSL_LIBRARY 
-        NAME libgsl.a 
-        PATHS ${GSL_STATIC_HOME}/lib ${GSL_STATIC_HOME}/lib64
-        NO_DEFAULT_PATH
+        NAME libgsl.so 
+	   #NAME libgsl.a 
+	   # PATHS ${GSL_STATIC_HOME}/lib ${GSL_STATIC_HOME}/lib64
+        PATHS /usr/lib
+	       NO_DEFAULT_PATH
         )
     find_library(GSLCBLAS_LIBRARY
-        NAME libgslcblas.a 
-        PATHS ${GSL_STATIC_HOME}/lib ${GSL_STATIC_HOME}/lib64 
-        NO_DEFAULT_PATH
+        NAME libgslcblas.so 
+	   #NAME libgslcblas.a 
+	   #PATHS ${GSL_STATIC_HOME}/lib ${GSL_STATIC_HOME}/lib64 
+        PATHS /usr/lib
+	       NO_DEFAULT_PATH
         )
     SET(GSL_LIBRARIES ${GSL_LIBRARY} ${GSLCBLAS_LIBRARY})
     set(GSL_INCLUDE_DIR ${GSL_STATIC_HOME}/include)
     MESSAGE("++ STATIC GSL_LIBRARIES ${GSL_LIBRARIES}")
+
+    #    SET(GSL_LIBRARIES "/usr/lib" "/usr/lib")
+    #    set(GSL_INCLUDE_DIR "usr/include")
+    #    MESSAGE("++ STATIC GSL_LIBRARIES ${GSL_LIBRARIES}")
 ELSE()
+	   MESSAGE("++ DYNAMIC GSL_LIBRARIES ${GSL_LIBRARIES}")
     find_package(GSL 1.16 REQUIRED)
 ENDIF()
 
@@ -248,9 +250,11 @@ endif()
 if(WITH_MPI)
     find_package(OpenMP REQUIRED)
     MESSAGE("++ OpenMPI support is ON")
-    add_definitions(-DUSE_OPENMPI)
+    add_definitions(-DUSE_OPENMPI -O1)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${-pthread}")
+	
 endif(WITH_MPI)
 
 #if(WITH_MPI)
