@@ -10,8 +10,6 @@
 #ifndef _VOXEL_POOLS_H
 #define _VOXEL_POOLS_H
 
-#include<malloc.h>
-
 static size_t const     cacheline_size = 64;
 typedef char            cacheline_pad_t [cacheline_size];
 
