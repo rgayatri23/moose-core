@@ -30,7 +30,7 @@ def do_nothing(*args):
     pass
 
 PI = 3.14159265359
-useGssa = False
+useGssa = True
 combineSegments = False
 baselineTime = 10
 tetTime = 1
@@ -212,7 +212,7 @@ def main():
 
     print 'real time = ', time.time() - t1
 
-    # displayPlots()
+    #displayPlots()
 
 if __name__ == '__main__':
     main()

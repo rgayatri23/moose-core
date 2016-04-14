@@ -319,8 +319,6 @@ void Gsolve::setRandInit( bool val )
 void Gsolve::process( const Eref& e, ProcPtr p )
 {
 
-//	cout << "Inside gsolve::pocess" << endl;
-	// cout << stoichPtr_ << "	dsolve = " <<	dsolvePtr_ << endl;
 	if ( !stoichPtr_ )
 		return;
 	// First, handle incoming diffusion values. Note potential for
@@ -376,11 +374,26 @@ void Gsolve::process( const Eref& e, ProcPtr p )
 			i->refreshAtot( &sys_ );
 		}
 	}
+
 	// Fifth, update the mol #s
-	for ( vector< GssaVoxelPools >::iterator 
-					i = pools_.begin(); i != pools_.end(); ++i ) {
-		i->advance( p, &sys_ );
+	// Rahul - parallelizing gsolve process function using openmp
+	GssaVoxelPools* poolArray_ = &pools_[0];
+	int poolSize = pools_.size();
+	int numThreads = 2;
+	int cellsPerThread = poolSize/numThreads;
+	GssaSystem* sysPtr;
+			  
+//	cout << "PoolSize = " << poolSize << endl;
+
+//#pragma omp parallel for num_threads(numThreads) schedule(guided, cellsPerThread) firstprivate(p) private(sysPtr)
+	for(int j = 0; j < poolSize; j++)
+	{
+			  sysPtr = &sys_;
+			  poolArray_[j].advance(p, sysPtr);
 	}
+
+//	for ( vector< GssaVoxelPools >::iterator i = pools_.begin(); i != pools_.end(); ++i ) 
+//			  i->advance( p, &sys_ );
 
 	// Finally, assemble and send the integrated values off for the Dsolve.
 	if ( dsolvePtr_ ) {

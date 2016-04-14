@@ -10,8 +10,8 @@
 #ifndef _KSOLVE_H
 #define _KSOLVE_H
 
-#define _KSOLVE_SEQ 0
-#define _KSOLVE_OPENMP_FOR 1
+#define _KSOLVE_SEQ 1
+#define _KSOLVE_OPENMP_FOR 0
 #define _KSOLVE_OPENMP_TASK 0
 #define _KSOLVE_PTHREADS 0
 

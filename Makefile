@@ -96,23 +96,27 @@ USE_GSL = true
 endif
 # Optimized mode:
 ifeq ($(BUILD),release)
-CXXFLAGS  = -O3 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+CXXFLAGS  = -O2 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+#CXXFLAGS  = -O3 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
 USE_GSL = true
 endif
 # Profiling mode:
 ifeq ($(BUILD),profile)
-CXXFLAGS  = -O3 -pg  -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+CXXFLAGS  = -O2 -pg  -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+#CXXFLAGS  = -O3 -pg  -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
 USE_GSL = true
 endif
 # Profiling mode with gperftoools
 ifeq ($(BUILD),gperf)
-CXXFLAGS  = -O3 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+CXXFLAGS  = -O2 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+#CXXFLAGS  = -O3 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
 LDFLAGS += -lprofiler -ltcmalloc
 USE_GSL = true
 endif
 # Threading mode:
 ifeq ($(BUILD),thread)
-CXXFLAGS  = -O3 -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+CXXFLAGS  = -O2 -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+#CXXFLAGS  = -O3 -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
 USE_GSL = true
 endif
 
@@ -125,7 +129,8 @@ endif
 
 # optimized MPI mode:
 ifeq ($(BUILD),ompi)
-CXXFLAGS  = -O3 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+CXXFLAGS  = -O2 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
+#CXXFLAGS  = -O3 -fpermissive -fno-strict-aliasing -fPIC -Wall -Wno-long-long -pedantic -DNDEBUG -DUSE_GENESIS_PARSER
 USE_MPI = 1
 USE_GSL = true
 endif

@@ -15,7 +15,6 @@
 #include <gsl/gsl_odeiv2.h>
 #endif
 
-
 #include <unistd.h>
 
 #include "OdeSystem.h"
@@ -704,29 +703,25 @@ void Ksolve::process( const Eref& e, ProcPtr p )
 	 static int cellsPerThread = 0; // Used for printing...
 	 VoxelPools* poolArray_ = &pools_[0]; //Call the vector as an array
 	 int j = 0;
-//	 int blockSize = poolSize/numThreads;
 
 	 if(!cellsPerThread)
 	 {
-		    cellsPerThread = 2;
+		    cellsPerThread = 1;
 		    cout << endl << "OpenMP parallelism: Using parallel-for " << endl;
 		    cout << "NUMBER OF CELLS PER THREAD = " << cellsPerThread << " And THREADS USED = " << numThreads << endl;
 	 }
 
-//	   struct timeval stop, start;
-//	   time_t time_taken = 0;
-//	   gettimeofday(&start, NULL);
-
-#pragma omp parallel for schedule(guided, cellsPerThread) num_threads(numThreads) shared(poolArray_,p, poolSize)
-	for(int j = 0; j < poolSize ; j++)
-		   advanceProcess(&poolArray_[j], 1, p);
-
-
-	//   gettimeofday(&stop, NULL);
-	//   time_taken = stop.tv_usec - start.tv_usec;
-
-	//cout << "PARALLEL Time Taken from rungekutta = " << time_taken << " With PoolSize = " << poolSize << "  varS() = " << poolSize*(poolArray_[0].getVoxeldriver()->s->dimension) << endl;
-
+#pragma omp parallel for schedule(guided, 1) num_threads(numThreads) private(j) firstprivate(p) shared(poolArray_, poolSize)
+	for(int j = 0; j < poolSize ; j+=cellsPerThread)
+	{
+			if(j +cellsPerThread < poolSize)
+					  advanceProcess(&poolArray_[j], cellsPerThread, p);
+			else 
+			{
+					  advanceProcess(&poolArray_[j], poolSize - j, p);
+					  j = poolSize;
+			}
+	}
 
 #endif //_KSOLVE_OPENMP_FOR
 /*************************************************************************************************************************************************************************************/
@@ -734,7 +729,7 @@ void Ksolve::process( const Eref& e, ProcPtr p )
 /***************************************************************KSOLVE OPENMP Task-based Parallelization ***************************************************************************/
 #if _KSOLVE_OPENMP_TASK
 	 static int usedThreads = 0;
-	 int numThreads = 2; //Each block will be executed by one thread
+	 int numThreads = 8; //Each block will be executed by one thread
 
 	 int poolSize = pools_.size();
 	 int blockSize = poolSize/numThreads; //Number of cells in each block

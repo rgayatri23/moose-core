@@ -76,7 +76,8 @@ option(DEBUG "Building with debugging support" OFF)
 option(GPROF "Build of gprof support" OFF)
 option(ENABLE_UNIT_TESTS "ENABLE UNIT TESTS IN MOOSE" ON)
 option(WITH_PYTHON "Build native python extension of MOOSE" ON)
-option(WITH_MPI  "Enable OPENMPI support" ON)
+option(WITH_OPENMP  "Enable OPENMPI support" ON)
+option(WITH_MPI  "Enable OPENMPI support" OFF)
 option(WITH_CURSES "Enable ncurses" OFF)
 # If GSL_STATIC_HOME is set, we use it to search for static gsl libs.
 option(GSL_STATIC_HOME 
@@ -246,8 +247,8 @@ if(READLINE_FOUND AND TERMCAP_FOUND)
     include_directories(${Readline_INCLUDE_DIR})
 endif()
 
-# Openmpi
-if(WITH_MPI)
+# Openmp
+if(WITH_OPENMP)
     find_package(OpenMP REQUIRED)
     MESSAGE("++ OpenMPI support is ON")
     add_definitions(-DUSE_OPENMPI -O1)
@@ -255,24 +256,24 @@ if(WITH_MPI)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${-pthread}")
 	
-endif(WITH_MPI)
+endif(WITH_OPENMP)
 
-#if(WITH_MPI)
-#    find_package(MPI REQUIRED)
-#    set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-#    set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-#    if(MPI_CXX_FOUND)
-#        message("++ Using MPI from ${MPI_CXX_INCLUDE_PATH}")
-#        include_directories(${MPI_CXX_INCLUDE_PATH})
-#        set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
-#        add_definitions(-DUSE_MPI)
-#        SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-#        MESSAGE(STATUS "MPI compiler: ${MPI_CXX_COMPILER}")
-#        SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-#    else()
-#        MESSAGE(FATAL_ERROR "No openmpi installed on this machine")
-#    endif()
-#endif(WITH_MPI)
+if(WITH_MPI)
+    find_package(MPI REQUIRED)
+    set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+    set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+    if(MPI_CXX_FOUND)
+        message("++ Using MPI from ${MPI_CXX_INCLUDE_PATH}")
+        include_directories(${MPI_CXX_INCLUDE_PATH})
+        set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
+        add_definitions(-DUSE_MPI)
+        SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+        MESSAGE(STATUS "MPI compiler: ${MPI_CXX_COMPILER}")
+        SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+    else()
+        MESSAGE(FATAL_ERROR "No openmpi installed on this machine")
+    endif()
+endif(WITH_MPI)
 
 # Add subdirectroeis
 add_subdirectory(basecode)
@@ -585,7 +586,6 @@ endif()
 ##        "
 ##        )
 ##endif(BUILD_MOOGLI)
-    
 
 ############################ CTEST ######################################
 
@@ -593,3 +593,4 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake_moose_ctest.cmake)
 
 ############################ CPACK ######################################
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake_moose_cpack.cmake)
+
