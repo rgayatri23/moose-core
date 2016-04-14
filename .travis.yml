@@ -20,7 +20,6 @@ cache: apt
 
 matrix:
     allow_failures:
-        - compiler: clang
 
 before_script:
     - sudo apt-get -y install libxml2-dev libbz2-dev
