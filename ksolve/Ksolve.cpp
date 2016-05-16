@@ -15,8 +15,9 @@
 #include <gsl/gsl_odeiv2.h>
 #endif
 
-
-#include <unistd.h>
+#include <boost/numeric/odeint.hpp>
+#include <boost/bind.hpp>
+#include "BoostSys.h"
 
 #include "OdeSystem.h"
 #include "VoxelPoolsBase.h"
@@ -39,138 +40,12 @@
 
 const unsigned int OFFNODE = ~0;
 
-time_t time_taken = 0;
-static int zeros = 0;
-
-int advanceProcess(VoxelPools* pool, int blockSize, ProcPtr p)
-{
-	   int GSLSUCCESS = 0;
-	   size_t i;
-	
-   for(int j =0; j < blockSize; j++)
-   {
-	   
-	   gsl_odeiv2_driver* localDriver_= pool[j].getVoxeldriver();
-	   const gsl_odeiv2_system* sys = localDriver_->sys;
-
-	   rkf45_state_t *state = (rkf45_state_t *) localDriver_->s->state;
-	   size_t dim = localDriver_->s->dimension;
-	   double t = p->currTime - p->dt;
-	   double h = localDriver_->h;
-	   double* y = pool[j].varS();
-	   double *yerr = localDriver_->e->yerr;
-	   const double* dydt_in = localDriver_->e->dydt_in;
-	   double* dydt_out = localDriver_->e->dydt_out;
-
-	   double *const k1 = state->k1;
-	   double *const k2 = state->k2;
-	   double *const k3 = state->k3;
-	   double *const k4 = state->k4;
-	   double *const k5 = state->k5;
-	   double *const k6 = state->k6;
-	   double *const ytmp = state->ytmp;
-	   double *const y0 = state->y0;
-    
-	   memcpy (y0, y, dim); // memcpy in case of failure...
-
-    /*K1 step */
-    {
-	    if (dydt_in == NULL)
-	    {
-			  int s = RKF45_ODEIV_FN_EVAL (sys, t, y, k1);
-			  if (s != GSLSUCCESS)
-					return s;
-	    }
-	    else
-			  memcpy (k1, dydt_in, dim);
-    }
-	    for (i = 0; i < dim; i++)
-			  ytmp[i] = y[i] + ah[0] * h * k1[i];
-
-    /*k2 step */
-    {
-	    int s = RKF45_ODEIV_FN_EVAL (sys, t + ah[0] * h, ytmp, k2);
-	    if (s != GSLSUCCESS)
-			  return s;
-    }
-	    for (i = 0; i < dim; i++)
-			  ytmp[i] = y[i] + h * (b3[0] * k1[i] + b3[1] * k2[i]);
-
-    /*k3 step */
-    {
-	     int s = RKF45_ODEIV_FN_EVAL (sys, t + ah[1] * h, ytmp, k3);
-		if (s != GSLSUCCESS)
-			   return s;
-    }
-
-		for (i = 0; i < dim; i++)
-			   ytmp[i] = y[i] + h * (b4[0] * k1[i] + b4[1] * k2[i] + b4[2] * k3[i]);
-
-	 /*k4 step*/ 
-    {
-		 int s = RKF45_ODEIV_FN_EVAL (sys, t + ah[2] * h, ytmp, k4);
-		 if (s != GSLSUCCESS)
-			    return s;
-    }
-
-		 for (i = 0; i < dim; i++)
-			    ytmp[i] =  y[i] + h * (b5[0] * k1[i] + b5[1] * k2[i] + b5[2] * k3[i] + b5[3] * k4[i]);
-
-	 /*k5 step */
-    {
-		 int s = RKF45_ODEIV_FN_EVAL (sys, t + ah[3] * h, ytmp, k5);
-		 if (s != GSLSUCCESS)
-			    return s;
-    }
-
-		 for (i = 0; i < dim; i++)
-			    ytmp[i] = y[i] + h * (b6[0] * k1[i] + b6[1] * k2[i] + b6[2] * k3[i] + b6[3] * k4[i] + b6[4] * k5[i]);
-
-	 /*k6 and final sum */
-    {
-		 int s = RKF45_ODEIV_FN_EVAL (sys, t + ah[4] * h, ytmp, k6);
-		 if (s != GSLSUCCESS)
-			    return s;
-    }
-
-		 for (i = 0; i < dim; i++)
-		 {
-			    const double d_i = c1 * k1[i] + c3 * k3[i] + c4 * k4[i] + c5 * k5[i] + c6 * k6[i];
-			    y[i] += h * d_i;
-		 }
-
-		 /* Derivatives at output */
-				   
-		 if (dydt_out != NULL)
-		 {
-			    int s = RKF45_ODEIV_FN_EVAL (sys, t + h, y, dydt_out);
-			    if (s != GSLSUCCESS)
-			    {
-					  /* Restore initial values */
-					  memcpy (y, y0, dim);
-					  return s;
-			    }
-		 }
-		 /* difference between 4th and 5th order */
-		   for (i = 0; i < dim; i++)
-				 yerr[i] = h * (ec[1] * k1[i] + ec[3] * k3[i] + ec[4] * k4[i] + ec[5] * k5[i] + ec[6] * k6[i]);
-
-   }
-
-
-   return GSLSUCCESS;
-}
-
-
-
 #if _KSOLVE_PTHREADS
-
 extern "C" void* call_func( void* f )
 {
 	   std::auto_ptr< pthreadWrap > w( static_cast< pthreadWrap* >( f ) );
 	   int localId = w->tid;
 	   bool* destroySignal = w->destroySig;
-
 
 	   while(!*destroySignal) 
 	   {
@@ -184,7 +59,8 @@ extern "C" void* call_func( void* f )
 			 int endIndex = startIndex + blz;
 
 		//Perform the advance function 
-		advanceProcess(&lpoolarray_[startIndex], blz, p);
+          for(int j = startIndex; j < endIndex; j++) 
+                  lpoolarray_[j].advance(p);
 
 		   sem_post(w->sThread); // Send the signal to the main thread. 
 	   }
@@ -194,8 +70,6 @@ extern "C" void* call_func( void* f )
 
 }
 #endif // _KSOLVE_PTHREADS
-
-
 
 // static function
 SrcFinfo2< Id, vector< double > >* Ksolve::xComptOut()
@@ -223,12 +97,15 @@ const Cinfo* Ksolve::initCinfo()
     static ValueFinfo< Ksolve, string > method (
         "method",
         "Integration method, using GSL. So far only explict. Options are:"
-        "rk5: The default Runge-Kutta-Fehlberg 5th order adaptive dt method"
-        "gsl: alias for the above"
+        "rk5: The default Runge-Kutta-Fehlberg 5th order fixed dt method"
+        "rk5a: The default Runge-Kutta-Fehlberg 5th order adaptive dt method"
         "rk4: The Runge-Kutta 4th order fixed dt method"
+        "rk4a: The Runge-Kutta 4th order adaptive dt method"
         "rk2: The Runge-Kutta 2,3 embedded fixed dt method"
-        "rkck: The Runge-Kutta Cash-Karp (4,5) method"
-        "rk8: The Runge-Kutta Prince-Dormand (8,9) method" ,
+        "rk54: The Runge-Kutta Cash-Karp (4,5) method (fixed dt)"
+        "rk54a: The Runge-Kutta Cash-Karp (4,5) method (adpative dt)"
+        "rk8: The Runge-Kutta Prince-Dormand (8,9) method (fixed dt)" 
+        "rk8a: The Runge-Kutta Prince-Dormand (8,9) method (adpative dt)" ,
         &Ksolve::setMethod,
         &Ksolve::getMethod
     );
@@ -395,19 +272,24 @@ static const Cinfo* ksolveCinfo = Ksolve::initCinfo();
 //////////////////////////////////////////////////////////////
 
 Ksolve::Ksolve()
-	: 
-		method_( "rk5" ),
-		epsAbs_( 1e-4 ),
-		epsRel_( 1e-6 ),
-		pools_( 1 ),
-		startVoxel_( 0 ),
-		dsolve_(),
-		dsolvePtr_( 0 )
+    :
+    method_( "rk5a" ),                          /* Adpative dt method is default. */
+    epsAbs_( 1e-4 ),
+    epsRel_( 1e-6 ),
+    pools_( 1 ),
+    startVoxel_( 0 ),
+    dsolve_(),
+    dsolvePtr_( 0 )
 {
 #if _KSOLVE_PTHREADS
 	   pthread_attr_t attr;
 	   pthread_attr_init(&attr);
 	   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+      
+      //Assign memory to each of the pointers
+      threads = (pthread_t*) malloc(NTHREADS*sizeof(pthread_t));
+      mainSemaphor = (sem_t*) malloc(NTHREADS*sizeof(sem_t));
+      threadSemaphor = (sem_t*) malloc(NTHREADS*sizeof(sem_t));
 
 	   destroySignal = new bool;
 	   *destroySignal = false;
@@ -421,30 +303,37 @@ Ksolve::Ksolve()
 			sem_init(&threadSemaphor[i],0,0);
 			sem_init(&mainSemaphor[i],0,0);
 
+         //Wrap the data needed by pthread into a structure
 			 pthreadWrap* w = new pthreadWrap(i, &threadSemaphor[i], &mainSemaphor[i], destroySignal, pthreadP, poolArray_, pthreadBlock);
 
+          //Create threads
 			 int rc = pthread_create(&threads[i], &attr, call_func, (void*) w);
 			 if(rc)
 				    printf("thread creation problem\n");
 	   }
 #endif
-;
+    ;
 }
 
 Ksolve::~Ksolve()
 {
 #if _KSOLVE_PTHREADS
+       //Tell Worker threads, its time to die...
 	   *destroySignal = true;
 
 	   for(int i = 0; i < NTHREADS; i++)
 			 sem_post(&mainSemaphor[i]);
 
+      //Join the threads
 	   for(int i = 0; i < NTHREADS; i++)
 			 pthread_join(threads[i], NULL);
-//			 sem_destroy(&threadSemaphor[i]);
-//			 sem_destroy(&mainSemaphor[i]);
+
+      //Free the memory
+      free(mainSemaphor);
+      free(threadSemaphor);
+      free(threads);
 #endif
-	   ;
+    ;
 }
 
 //////////////////////////////////////////////////////////////
@@ -682,147 +571,61 @@ double Ksolve::getEstimatedDt() const
 
 void Ksolve::process( const Eref& e, ProcPtr p )
 {
+    if ( isBuilt_ == false )
+        return;
+    // First, handle incoming diffusion values, update S with those.
+    if ( dsolvePtr_ )
+    {
+        vector< double > dvalues( 4 );
+        dvalues[0] = 0;
+        dvalues[1] = getNumLocalVoxels();
+        dvalues[2] = 0;
+        dvalues[3] = stoichPtr_->getNumVarPools();
+        dsolvePtr_->getBlock( dvalues );
 
+        setBlock( dvalues );
+    }
+    // Second, take the arrived xCompt reac values and update S with them.
+    for ( unsigned int i = 0; i < xfer_.size(); ++i )
+    {
+        const XferInfo& xf = xfer_[i];
+        // cout << xfer_.size() << "	" << xf.xferVoxel.size() << endl;
+        for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j )
+        {
+            pools_[xf.xferVoxel[j]].xferIn(
+                xf.xferPoolIdx, xf.values, xf.lastValues, j );
+        }
+    }
+    // Third, record the current value of pools as the reference for the
+    // next cycle.
+    for ( unsigned int i = 0; i < xfer_.size(); ++i )
+    {
+        XferInfo& xf = xfer_[i];
+        for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j )
+        {
+            pools_[xf.xferVoxel[j]].xferOut( j, xf.lastValues, xf.xferPoolIdx );
+        }
+    }
 
-        static unsigned int usedThreads = 0;
-
-
-	if ( isBuilt_ == false )
-		return;
-	// First, handle incoming diffusion values, update S with those.
-	if ( dsolvePtr_ ) {
-		vector< double > dvalues( 4 );
-		dvalues[0] = 0;
-		dvalues[1] = getNumLocalVoxels();
-		dvalues[2] = 0;
-		dvalues[3] = stoichPtr_->getNumVarPools();
-		dsolvePtr_->getBlock( dvalues );
-		
-		setBlock( dvalues );
-	}
-
-//	 omp_set_num_threads(4);
-	// Second, take the arrived xCompt reac values and update S with them.
-
-	for ( unsigned int i = 0; i < xfer_.size(); ++i ) 
-	{
-		const XferInfo& xf = xfer_[i];
-		for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j ) 
-		{
-			pools_[xf.xferVoxel[j]].xferIn(xf.xferPoolIdx, xf.values, xf.lastValues, j );
-		}
-	}
-
-	// Third, record the current value of pools as the reference for the
-	// next cycle.
-	for ( unsigned int i = 0; i < xfer_.size(); ++i ) 
-	{
-		XferInfo& xf = xfer_[i];
-		for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j ) 
-		{
-			pools_[xf.xferVoxel[j]].xferOut( j, xf.lastValues, xf.xferPoolIdx );
-		}
-	}
-
-#if _KSOLVE_SEQ
-	static int seqVersion = 0;
-	 VoxelPools* poolArray_ = &pools_[0]; //Call the vector as an array
-	 int poolSize = pools_.size(); //Find out the size of the vector
-
-	 if(!seqVersion)
-	 {
-		    seqVersion = 1;
-		    cout << endl << "Sequential Version " << endl;
-	 }
-
-	for(int j = 0; j < poolSize ; j++)
-		   advanceProcess(&poolArray_[j], 1, p);
-//		   poolArray_[j].advance(p);
-
-
-#endif     
-
-/***************************************************************KSOLVE OPENMP Parallel-for Parallelization ***************************************************************************/
-#if _KSOLVE_OPENMP_FOR
-		   
-	 int numThreads = 8; //Define the number of threads
+    // Fourth, do the numerical integration for all reactions.
+#if _KSOLVE_OPENMP
 	 int poolSize = pools_.size(); //Find out the size of the vector
 	 static int cellsPerThread = 0; // Used for printing...
-	 VoxelPools* poolArray_ = &pools_[0]; //Call the vector as an array
-	 int j = 0;
-//	 int blockSize = poolSize/numThreads;
-
 	 if(!cellsPerThread)
 	 {
 		    cellsPerThread = 2;
 		    cout << endl << "OpenMP parallelism: Using parallel-for " << endl;
-		    cout << "NUMBER OF CELLS PER THREAD = " << cellsPerThread << " And THREADS USED = " << numThreads << endl;
+		    cout << "NUMBER OF CELLS PER THREAD = " << cellsPerThread << "\t threads used = " << NTHREADS << endl;
 	 }
 
-//	   struct timeval stop, start;
-//	   time_t time_taken = 0;
-//	   gettimeofday(&start, NULL);
-
-#pragma omp parallel for schedule(guided, cellsPerThread) num_threads(numThreads) shared(poolArray_,p, poolSize)
-	for(int j = 0; j < poolSize ; j++)
-		   advanceProcess(&poolArray_[j], 1, p);
+#pragma omp parallel for schedule(guided, cellsPerThread) num_threads(NTHREADS) shared(poolSize) firstprivate(p)
+    for ( int j = 0; j < poolSize; j++ )
+        pools_[j].advance( p );
+#endif //_KSOLVE_OPENMP
 
 
-	//   gettimeofday(&stop, NULL);
-	//   time_taken = stop.tv_usec - start.tv_usec;
-
-	//cout << "PARALLEL Time Taken from rungekutta = " << time_taken << " With PoolSize = " << poolSize << "  varS() = " << poolSize*(poolArray_[0].getVoxeldriver()->s->dimension) << endl;
-
-
-#endif //_KSOLVE_OPENMP_FOR
-/*************************************************************************************************************************************************************************************/
-
-/***************************************************************KSOLVE OPENMP Task-based Parallelization ***************************************************************************/
-#if _KSOLVE_OPENMP_TASK
-	 static int usedThreads = 0;
-	 int numThreads = 2; //Each block will be executed by one thread
-
-	 int poolSize = pools_.size();
-	 int blockSize = poolSize/numThreads; //Number of cells in each block
-	 int remainder = poolSize % blockSize;
-
-#pragma omp parallel num_threads(numThreads)
-#pragma omp single 
-        {
-	        if( usedThreads == 0)
-	        {
-	        	usedThreads = numThreads;
-	        	cout << "Info: OpenMP tasking: Threads used: " << usedThreads << endl;
-	        }
-
-		   int iterator = 0, j = 0;
-		   vector<VoxelPools>::iterator i = pools_.begin();
-
-            while(iterator < numThreads)
-            {
-                vector<VoxelPools>::iterator threadIterator = i;
-#pragma omp task private(j) firstprivate(threadIterator, blockSize,p)
-                {
-                    for(j = 0; j < blockSize ; threadIterator++,j++)
-                        threadIterator->advance( p );
-                }
-
-                for(j = 0; j < blockSize ;j++) i++;
-                iterator++;
-            }
-
-#pragma omp parallel for schedule (guided, 1) firstprivate(p) 
-		  for ( vector< VoxelPools >::iterator k = i; k < pools_.end(); ++k ) 
-				k->advance( p );
-
-#pragma omp taskwait
-        }
-
-#endif //_KSOLVE_OPENMP_TASK	   
-/*************************************************************************************************************************************************************************************/
 
 #if _KSOLVE_PTHREADS
-
 	 static int usedThreads = 0;
 
 	 clock_t startPthreadTimer = clock();
@@ -842,52 +645,67 @@ void Ksolve::process( const Eref& e, ProcPtr p )
 	for(int i = 0; i < NTHREADS; i++)
 		   sem_post(&mainSemaphor[i]); //Send signal to the threads to start
 
-	advanceProcess(&pools_[NTHREADS*(*pthreadBlock)], poolSize-NTHREADS*(*pthreadBlock), p);
+   for(int j= NTHREADS*(*pthreadBlock); j < poolSize; j++)
+           pools_[j].advance(p);
 
 	for(int i = 0; i < NTHREADS; i++)
 		   sem_wait(&threadSemaphor[i]); // Wait for threads to finish their work
 
 #endif //_KSOLVE_PTHREADS
 
-        // Finally, assemble and send the integrated values off for the Dsolve.
-        if ( dsolvePtr_ ) {
-            vector< double > kvalues( 4 );
-            kvalues[0] = 0;
-            kvalues[1] = getNumLocalVoxels();
-            kvalues[2] = 0;
-            kvalues[3] = stoichPtr_->getNumVarPools();
-            getBlock( kvalues );
-            dsolvePtr_->setBlock( kvalues );
-        }
+//////////////////////////////////////////////////////////////////
+// Original Sequential Code
+//////////////////////////////////////////////////////////////////
+#if _KSOLVE_SEQ
+    for ( vector< VoxelPools >::iterator i = pools_.begin(); i != pools_.end(); ++i )
+        i->advance( p );
+#endif //_KSOLVE_SEQ
 
-
+    // Finally, assemble and send the integrated values off for the Dsolve.
+    if ( dsolvePtr_ )
+    {
+        vector< double > kvalues( 4 );
+        kvalues[0] = 0;
+        kvalues[1] = getNumLocalVoxels();
+        kvalues[2] = 0;
+        kvalues[3] = stoichPtr_->getNumVarPools();
+        getBlock( kvalues );
+        dsolvePtr_->setBlock( kvalues );
+    }
 }
 
 void Ksolve::reinit( const Eref& e, ProcPtr p )
 {
     assert( stoichPtr_ );
-    if ( isBuilt_ ) {
+    if ( isBuilt_ )
+    {
         for ( unsigned int i = 0 ; i < pools_.size(); ++i )
             pools_[i].reinit( p->dt );
-    } else {
+    }
+    else
+    {
         cout << "Warning:Ksolve::reinit: Reaction system not initialized\n";
         return;
     }
     // cout << "************************* path = " << e.id().path() << endl;
-    for ( unsigned int i = 0; i < xfer_.size(); ++i ) {
+    for ( unsigned int i = 0; i < xfer_.size(); ++i )
+    {
         const XferInfo& xf = xfer_[i];
-        for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j ) {
-            pools_[xf.xferVoxel[j]].xferInOnlyProxies( 
-                    xf.xferPoolIdx, xf.values, 
-                    stoichPtr_->getNumProxyPools(),
-                    j );
+        for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j )
+        {
+            pools_[xf.xferVoxel[j]].xferInOnlyProxies(
+                xf.xferPoolIdx, xf.values,
+                stoichPtr_->getNumProxyPools(),
+                j );
         }
     }
-    for ( unsigned int i = 0; i < xfer_.size(); ++i ) {
+    for ( unsigned int i = 0; i < xfer_.size(); ++i )
+    {
         XferInfo& xf = xfer_[i];
-        for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j ) {
-            pools_[xf.xferVoxel[j]].xferOut( 
-                    j, xf.lastValues, xf.xferPoolIdx );
+        for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j )
+        {
+            pools_[xf.xferVoxel[j]].xferOut(
+                j, xf.lastValues, xf.xferPoolIdx );
         }
     }
 }
@@ -915,16 +733,19 @@ void Ksolve::initProc( const Eref& e, ProcPtr p )
 
 void Ksolve::initReinit( const Eref& e, ProcPtr p )
 {
-    for ( unsigned int i = 0 ; i < pools_.size(); ++i ) {
+    for ( unsigned int i = 0 ; i < pools_.size(); ++i )
+    {
         pools_[i].reinit( p->dt );
     }
     // vector< vector< double > > values( xfer_.size() );
-    for ( unsigned int i = 0; i < xfer_.size(); ++i ) {
+    for ( unsigned int i = 0; i < xfer_.size(); ++i )
+    {
         XferInfo& xf = xfer_[i];
         unsigned int size = xf.xferPoolIdx.size() * xf.xferVoxel.size();
-        //		xf.values.assign( size, 0.0 );
+//		xf.values.assign( size, 0.0 );
         xf.lastValues.assign( size, 0.0 );
-        for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j ) {
+        for ( unsigned int j = 0; j < xf.xferVoxel.size(); ++j )
+        {
             unsigned int vox = xf.xferVoxel[j];
             pools_[ vox ].xferOut( j, xf.lastValues, xf.xferPoolIdx );
             // values[i] = xf.lastValues;
@@ -941,17 +762,21 @@ void Ksolve::initReinit( const Eref& e, ProcPtr p )
  */
 void Ksolve::updateRateTerms( unsigned int index )
 {
-    if ( index == ~0U ) {
+    if ( index == ~0U )
+    {
         // unsigned int numCrossRates = stoichPtr_->getNumRates() - stoichPtr_->getNumCoreRates();
-        for ( unsigned int i = 0 ; i < pools_.size(); ++i ) {
+        for ( unsigned int i = 0 ; i < pools_.size(); ++i )
+        {
             // pools_[i].resetXreacScale( numCrossRates );
             pools_[i].updateAllRateTerms( stoichPtr_->getRateTerms(),
-                    stoichPtr_->getNumCoreRates() );
+                                          stoichPtr_->getNumCoreRates() );
         }
-    } else if ( index < stoichPtr_->getNumRates() ) {
+    }
+    else if ( index < stoichPtr_->getNumRates() )
+    {
         for ( unsigned int i = 0 ; i < pools_.size(); ++i )
             pools_[i].updateRateTerms( stoichPtr_->getRateTerms(),
-                    stoichPtr_->getNumCoreRates(), index );
+                                       stoichPtr_->getNumCoreRates(), index );
     }
 }
 
@@ -968,7 +793,7 @@ unsigned int Ksolve::getPoolIndex( const Eref& e ) const
 unsigned int Ksolve::getVoxelIndex( const Eref& e ) const
 {
     unsigned int ret = e.dataIndex();
-    if ( ret < startVoxel_  || ret >= startVoxel_ + pools_.size() ) 
+    if ( ret < startVoxel_  || ret >= startVoxel_ + pools_.size() )
         return OFFNODE;
     return ret - startVoxel_;
 }
@@ -1061,9 +886,11 @@ void Ksolve::getBlock( vector< double >& values ) const
     assert( numPools + startPool <= pools_[0].size() );
     values.resize( 4 + numVoxels * numPools );
 
-    for ( unsigned int i = 0; i < numVoxels; ++i ) {
+    for ( unsigned int i = 0; i < numVoxels; ++i )
+    {
         const double* v = pools_[ startVoxel + i ].S();
-        for ( unsigned int j = 0; j < numPools; ++j ) {
+        for ( unsigned int j = 0; j < numPools; ++j )
+        {
             values[ 4 + j * numVoxels + i]  = v[ j + startPool ];
         }
     }
@@ -1082,9 +909,11 @@ void Ksolve::setBlock( const vector< double >& values )
     assert( numPools + startPool <= pools_[0].size() );
     assert( values.size() == 4 + numVoxels * numPools );
 
-    for ( unsigned int i = 0; i < numVoxels; ++i ) {
+    for ( unsigned int i = 0; i < numVoxels; ++i )
+    {
         double* v = pools_[ startVoxel + i ].varS();
-        for ( unsigned int j = 0; j < numPools; ++j ) {
+        for ( unsigned int j = 0; j < numPools; ++j )
+        {
             v[ j + startPool ] = values[ 4 + j * numVoxels + i ];
         }
     }
@@ -1096,8 +925,10 @@ void Ksolve::updateVoxelVol( vector< double > vols )
     // For now we assume identical numbers of voxels. Also assume
     // identical voxel junctions. But it should not be too hard to
     // update those too.
-    if ( vols.size() == pools_.size() ) {
-        for ( unsigned int i = 0; i < vols.size(); ++i ) {
+    if ( vols.size() == pools_.size() )
+    {
+        for ( unsigned int i = 0; i < vols.size(); ++i )
+        {
             pools_[i].setVolumeAndDependencies( vols[i] );
         }
         stoichPtr_->setupCrossSolverReacVols();
@@ -1115,9 +946,10 @@ void Ksolve::updateVoxelVol( vector< double > vols )
 
 void Ksolve::print() const
 {
-    cout << "path = " << stoichPtr_->getKsolve().path() << 
-        ", numPools = " << pools_.size() << "\n";
-    for ( unsigned int i = 0; i < pools_.size(); ++i ) {
+    cout << "path = " << stoichPtr_->getKsolve().path() <<
+         ", numPools = " << pools_.size() << "\n";
+    for ( unsigned int i = 0; i < pools_.size(); ++i )
+    {
         cout << "pools[" << i << "] contents = ";
         pools_[i].print();
     }
@@ -1125,14 +957,16 @@ void Ksolve::print() const
     cout << "dsolve = " << dsolve_.path() << endl;
     cout << "compartment = " << compartment_.path() << endl;
     cout << "xfer summary: numxfer = " << xfer_.size() << "\n";
-    for ( unsigned int i = 0; i < xfer_.size(); ++i ) {
-        cout << "xfer_[" << i << "] numValues=" << 
-            xfer_[i].values.size() <<
-            ", xferPoolIdx.size = " << xfer_[i].xferPoolIdx.size() <<
-            ", xferVoxel.size = " << xfer_[i].xferVoxel.size() << endl;
+    for ( unsigned int i = 0; i < xfer_.size(); ++i )
+    {
+        cout << "xfer_[" << i << "] numValues=" <<
+             xfer_[i].values.size() <<
+             ", xferPoolIdx.size = " << xfer_[i].xferPoolIdx.size() <<
+             ", xferVoxel.size = " << xfer_[i].xferVoxel.size() << endl;
     }
     cout << "xfer details:\n";
-    for ( unsigned int i = 0; i < xfer_.size(); ++i ) {
+    for ( unsigned int i = 0; i < xfer_.size(); ++i )
+    {
         cout << "xfer_[" << i << "] xferPoolIdx=\n";
         const vector< unsigned int>& xi = xfer_[i].xferPoolIdx;
         for ( unsigned int j = 0; j << xi.size(); ++j )
