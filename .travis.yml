@@ -45,4 +45,5 @@ script:
     - echo "WITH_MPI is off!. Fix me later" 
     - cmake -DDEBUG=ON -DWITH_DOC=OFF -WITH_MPI=OFF -DPYTHON_EXECUTABLE=/usr/bin/python .. 
     - make
+    - export NUM_THREADS=2
     - ctest --output-on-failure
