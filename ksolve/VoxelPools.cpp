@@ -136,8 +136,20 @@ cleaner.
      */
     double absTol = sys_.epsAbs;
     double relTol = sys_.epsRel;
+<<<<<<< HEAD
     string method = sys_.method;
     double fixedDt = 0.01;
+=======
+
+
+    /**
+     * @brief Default step size for fixed size iterator. 
+     * FIXME/TODO: I am not sure if this is a right value to pick by default. May be
+     * user should provide the stepping size when using fixed dt. This feature
+     * can be incredibly useful on large system.
+     */
+    const double fixedDt = 0.1;
+>>>>>>> 56fdc364fc094a6174c438ef0cf59276349831cd
 
     if( sys_.method == "rk2" )
         odeint::integrate_const( rk_midpoint_stepper_type_()

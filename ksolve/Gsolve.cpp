@@ -402,8 +402,7 @@ void Gsolve::process( const Eref& e, ProcPtr p )
 	}
 	// Fifth, update the mol #s.
 	// First we advance the simulation.
-	for ( vector< GssaVoxelPools >::iterator 
-					i = pools_.begin(); i != pools_.end(); ++i ) {
+	for ( vector< GssaVoxelPools >::iterator i = pools_.begin(); i != pools_.end(); ++i ) {
 		i->advance( p, &sys_ );
 	}
 	if ( useClockedUpdate_ ) { // Check if a clocked stim is to be updated
