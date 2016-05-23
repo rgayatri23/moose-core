@@ -165,6 +165,7 @@ include_directories( ${CMAKE_CURRENT_SOURCE_DIR} )
 
 if(WITH_BOOST)
     set(WITH_GSL OFF)
+    message(STATUS "USING BOOST LIBRARIES")
 endif(WITH_BOOST)
 
 # If this variable is used while packaging; we build this project using another

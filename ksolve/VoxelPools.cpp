@@ -34,7 +34,6 @@ using namespace boost::numeric;
 // Class definitions
 //////////////////////////////////////////////////////////////
 
-//Rahul - adding some random work just to increase the time spent in process function...
 time_t time_taken_voxel = 0;
 
 VoxelPools::VoxelPools()
@@ -137,6 +136,7 @@ cleaner.
     double absTol = sys_.epsAbs;
     double relTol = sys_.epsRel;
 <<<<<<< HEAD
+<<<<<<< HEAD
     string method = sys_.method;
     double fixedDt = 0.01;
 =======
@@ -150,6 +150,10 @@ cleaner.
      */
     const double fixedDt = 0.1;
 >>>>>>> 56fdc364fc094a6174c438ef0cf59276349831cd
+=======
+    string method = sys_.method;
+    double fixedDt = 0.01;
+>>>>>>> b294171abe76f8568fb1c212e09b68e9aad5345b
 
     if( sys_.method == "rk2" )
         odeint::integrate_const( rk_midpoint_stepper_type_()

@@ -6,12 +6,18 @@
 ** GNU Lesser General Public License version 2.1
 ** See the file COPYING.LIB for the full notice.
 **********************************************************************/
+#include <omp.h>
+#include <sys/time.h>
 #include "header.h"
 #ifdef USE_GSL
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_odeiv2.h>
 #endif
+
+#include <boost/numeric/odeint.hpp>
+#include <boost/bind.hpp>
+#include "BoostSys.h"
 
 #include "OdeSystem.h"
 #include "VoxelPoolsBase.h"
@@ -33,7 +39,6 @@
 #include "Ksolve.h"
 
 const unsigned int OFFNODE = ~0;
-
 
 #if _KSOLVE_PTHREADS
 extern "C" void* call_func( void* f )
@@ -592,17 +597,6 @@ void Ksolve::process( const Eref& e, ProcPtr p )
         dvalues[3] = stoichPtr_->getNumVarPools();
         dsolvePtr_->getBlock( dvalues );
 
-        /*
-        vector< double >::iterator i = dvalues.begin() + 4;
-        for ( ; i != dvalues.end(); ++i )
-        	cout << *i << "	" << round( *i ) << endl;
-        getBlock( kvalues );
-        vector< double >::iterator d = dvalues.begin() + 4;
-        for ( vector< double >::iterator
-        		k = kvalues.begin() + 4; k != kvalues.end(); ++k )
-        		*k++ = ( *k + *d )/2.0
-        setBlock( kvalues );
-        */
         setBlock( dvalues );
     }
     // Second, take the arrived xCompt reac values and update S with them.
@@ -633,12 +627,12 @@ void Ksolve::process( const Eref& e, ProcPtr p )
 	 static int cellsPerThread = 0; // Used for printing...
 	 if(!cellsPerThread)
 	 {
-		    cellsPerThread = 2;
+		    cellsPerThread = 1;
 		    cout << endl << "OpenMP parallelism: Using parallel-for " << endl;
 		    cout << "NUMBER OF CELLS PER THREAD = " << cellsPerThread << "\t threads used = " << NTHREADS << endl;
 	 }
 
-#pragma omp parallel for schedule(guided, cellsPerThread) num_threads(NTHREADS) shared(poolSize) firstprivate(p)
+#pragma omp parallel for schedule(guided, cellsPerThread) num_threads(NTHREADS) shared(poolSize) firstprivate(p) if(poolSize > NTHREADS)
     for ( int j = 0; j < poolSize; j++ )
         pools_[j].advance( p );
 #endif //_KSOLVE_OPENMP
@@ -670,9 +664,11 @@ void Ksolve::process( const Eref& e, ProcPtr p )
 	for(int i = 0; i < NTHREADS; i++)
 		   sem_wait(&threadSemaphor[i]); // Wait for threads to finish their work
 
-#endif //_KSOLVE_PTHREADS
+#endif //_KSOLVE_PTHREADS 
 
-
+//////////////////////////////////////////////////////////////////
+// Original Sequential Code
+//////////////////////////////////////////////////////////////////
 #if _KSOLVE_SEQ
     for ( vector< VoxelPools >::iterator
             i = pools_.begin(); i != pools_.end(); ++i )
@@ -680,6 +676,7 @@ void Ksolve::process( const Eref& e, ProcPtr p )
         i->advance( p );
     }
 #endif //_KSOLVE_SEQ
+
     // Finally, assemble and send the integrated values off for the Dsolve.
     if ( dsolvePtr_ )
     {
@@ -816,6 +813,7 @@ unsigned int Ksolve::getVoxelIndex( const Eref& e ) const
         return OFFNODE;
     return ret - startVoxel_;
 }
+
 
 //////////////////////////////////////////////////////////////
 // Zombie Pool Access functions
