@@ -403,6 +403,7 @@ void Gsolve::process( const Eref& e, ProcPtr p )
 	// Fifth, update the mol #s.
 	// First we advance the simulation.
 <<<<<<< HEAD
+<<<<<<< HEAD
 	for ( vector< GssaVoxelPools >::iterator i = pools_.begin(); i != pools_.end(); ++i ) {
 		i->advance( p, &sys_ );
 =======
@@ -411,6 +412,31 @@ void Gsolve::process( const Eref& e, ProcPtr p )
            i->advance( p, &sys_ );
 >>>>>>> b294171abe76f8568fb1c212e09b68e9aad5345b
 	}
+=======
+///////////////////////////////////////////////////////
+// Parallel GSOLVE::Advance with OpenMP 
+///////////////////////////////////////////////////////
+   int poolSize = pools_.size();
+   GssaSystem* sysPtr = &sys_;
+   static int cellsPerThread = 0; // Used for printing...
+   int j;
+   if(!cellsPerThread)
+   {
+           cellsPerThread = 4;
+           cout << endl << "OpenMP parallelism: Using parallel-for in GSOLVE " << endl;
+           cout << "NUMBER OF CELLS PER THREAD = " << cellsPerThread << "\t threads used = " << NTHREADS << endl;
+	 }
+   cout << "poolSize = " << poolSize << endl;
+#pragma omp parallel for schedule(guided, cellsPerThread) num_threads(NTHREADS) shared(poolSize,p) firstprivate(sysPtr) if(poolSize>NTHREADS)
+	for ( int j = 0; j < poolSize; j++ ) 
+           pools_[j].advance( p, sysPtr );
+
+//	for ( vector< GssaVoxelPools >::iterator i = pools_.begin(); i != pools_.end(); ++i ) 
+//   {
+//           i->advance( p, &sys_ );
+//	}
+
+>>>>>>> multithreaded
 	if ( useClockedUpdate_ ) { // Check if a clocked stim is to be updated
 		for ( vector< GssaVoxelPools >::iterator 
 					i = pools_.begin(); i != pools_.end(); ++i ) {
